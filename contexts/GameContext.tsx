@@ -56,7 +56,14 @@ export const [GameProvider, useGame] = createContextHook(() => {
         player2Score,
         player1Symbol,
         player2Symbol,
-        palette,
+        palette: {
+          id: palette.id,
+          name: palette.name,
+          background: palette.background,
+          foreground: palette.foreground,
+          dim: palette.dim,
+          accent: palette.accent,
+        },
         gameMode,
         eraserMode,
         switchMode,
@@ -70,7 +77,10 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
   useEffect(() => {
     if (isLoaded) {
-      saveState();
+      const timeoutId = setTimeout(() => {
+        saveState();
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
   }, [isLoaded, saveState]);
 
@@ -210,6 +220,8 @@ export const [GameProvider, useGame] = createContextHook(() => {
   }, [board, winner, isDraw, currentPlayer, player1Symbol, player2Symbol, gamesPlayed, eraserMode]);
 
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
     if (gameMode === 'ai' && currentPlayer === 'O' && !winner && !isDraw) {
       const availableMoves = board
         .map((cell, index) => (cell === null ? index : null))
@@ -233,32 +245,47 @@ export const [GameProvider, useGame] = createContextHook(() => {
 
       const winningMove = findWinningMove(aiSymbol);
       if (winningMove !== null) {
-        setTimeout(() => makeMove(winningMove), 500);
-        return;
+        timeoutId = setTimeout(() => makeMove(winningMove), 500);
+        return () => {
+          if (timeoutId) clearTimeout(timeoutId);
+        };
       }
 
       const blockingMove = findWinningMove(playerSymbol);
       if (blockingMove !== null) {
-        setTimeout(() => makeMove(blockingMove), 500);
-        return;
+        timeoutId = setTimeout(() => makeMove(blockingMove), 500);
+        return () => {
+          if (timeoutId) clearTimeout(timeoutId);
+        };
       }
 
       if (board[4] === null) {
-        setTimeout(() => makeMove(4), 500);
-        return;
+        timeoutId = setTimeout(() => makeMove(4), 500);
+        return () => {
+          if (timeoutId) clearTimeout(timeoutId);
+        };
       }
 
       const corners = [0, 2, 6, 8];
       const availableCorners = corners.filter(i => board[i] === null);
       if (availableCorners.length > 0) {
         const randomCorner = availableCorners[Math.floor(Math.random() * availableCorners.length)];
-        setTimeout(() => makeMove(randomCorner), 500);
-        return;
+        timeoutId = setTimeout(() => makeMove(randomCorner), 500);
+        return () => {
+          if (timeoutId) clearTimeout(timeoutId);
+        };
       }
 
       const randomMove = availableMoves[Math.floor(Math.random() * availableMoves.length)];
-      setTimeout(() => makeMove(randomMove), 500);
+      timeoutId = setTimeout(() => makeMove(randomMove), 500);
+      return () => {
+        if (timeoutId) clearTimeout(timeoutId);
+      };
     }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [gameMode, currentPlayer, winner, isDraw, board, player1Symbol, player2Symbol, makeMove]);
 
   const resetGame = useCallback(() => {

@@ -40,13 +40,16 @@ export default function GameScreen() {
   const [gameStarted, setGameStarted] = useState<boolean>(false);
 
   useEffect(() => {
+    let isMounted = true;
     if (winner || isDraw) {
-      setShowWinAnimation(true);
+      if (isMounted) {
+        setShowWinAnimation(true);
+      }
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
-      Animated.sequence([
+      const animation = Animated.sequence([
         Animated.spring(scaleAnim, {
           toValue: 1.1,
           useNativeDriver: true,
@@ -55,9 +58,16 @@ export default function GameScreen() {
           toValue: 1,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+      animation.start();
+      return () => {
+        isMounted = false;
+        animation.stop();
+      };
     } else {
-      setShowWinAnimation(false);
+      if (isMounted) {
+        setShowWinAnimation(false);
+      }
     }
   }, [winner, isDraw, scaleAnim]);
 
@@ -96,13 +106,13 @@ export default function GameScreen() {
       onStartShouldSetPanResponder: () => switchMode && !winner && !isDraw,
       onMoveShouldSetPanResponder: () => switchMode && !winner && !isDraw,
       onPanResponderGrant: (evt, gestureState) => {
-        if (!switchMode) return;
+        if (!switchMode || winner || isDraw) return;
         const { locationX, locationY } = evt.nativeEvent;
         const cell = getCellFromPosition(locationX, locationY);
         setSwipeStartCell(cell);
       },
       onPanResponderMove: (evt, gestureState) => {
-        if (!switchMode || swipeStartCell === null) return;
+        if (!switchMode || swipeStartCell === null || winner || isDraw) return;
         const { locationX, locationY } = evt.nativeEvent;
         const cell = getCellFromPosition(locationX, locationY);
         if (cell !== null && cell !== swipeStartCell) {
@@ -118,7 +128,16 @@ export default function GameScreen() {
     })
   ).current;
 
-  const boardContainerRef = useRef<View | null>(null);
+  const boardContainerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const handleCellPress = useCallback((index: number) => {
     if (winner || isDraw) return;
@@ -169,18 +188,16 @@ export default function GameScreen() {
               clearInterval(timerIntervalRef.current);
               timerIntervalRef.current = null;
             }
-            setTimeout(() => {
-              Alert.alert(
-                'TIME\'S UP!',
-                `${currentPlayer === 'X' ? player1Symbol : player2Symbol} ran out of time and loses!`,
-                [
-                  {
-                    text: 'NEW GAME',
-                    onPress: () => resetGame(),
-                  },
-                ]
-              );
-            }, 100);
+            Alert.alert(
+              'TIME\'S UP!',
+              `${currentPlayer === 'X' ? player1Symbol : player2Symbol} ran out of time and loses!`,
+              [
+                {
+                  text: 'NEW GAME',
+                  onPress: () => resetGame(),
+                },
+              ]
+            );
             return 0;
           }
           return newTime;
